@@ -1,0 +1,248 @@
+{
+	"name": "CosmosDbSqlApiCollection3",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "CosmosDbTransform",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "CosmosDbSqlApiCollection",
+		"schema": {
+			"type": "object",
+			"properties": {
+				"sourceId": {
+					"type": "string"
+				},
+				"statusCodes": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"country": {
+					"type": "string"
+				},
+				"budgetLine": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"additionalField3": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"quantityUOM": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"additionalField4": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"additionalField5": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"jurisdiction": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"conceptCode": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"ingestLinkID": {
+					"type": "string"
+				},
+				"postingDate": {
+					"type": "string"
+				},
+				"profitCenter": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"assignmentNbr": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"taxtype": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"accountID": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"reversalReason": {
+					"type": "string"
+				},
+				"statusReason": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"exchangeRate": {
+					"type": "string"
+				},
+				"legacyPO": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"currency": {
+					"type": "string"
+				},
+				"company": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"accountingPrinciple": {
+					"type": "string"
+				},
+				"docReferenceNumber": {
+					"type": "string"
+				},
+				"department": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"retailAmount": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"item": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"docHeaderText": {
+					"type": "string"
+				},
+				"costCenter": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"reversalDate": {
+					"type": "string"
+				},
+				"accountType": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"docInfo": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"costAmount": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"docDate": {
+					"type": "string"
+				},
+				"determineTaxBase": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"quantityAmount": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"baseAmount": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"internalOrder": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"centralBuyingRegion": {
+					"type": "string"
+				},
+				"tradingPartner": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"referenceNbr": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"businessTransaction": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"additionalField1": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"additionalField2": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"In Reference To": {
+					"type": "string"
+				}
+			}
+		},
+		"typeProperties": {
+			"collectionName": "postittransformcontainer"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

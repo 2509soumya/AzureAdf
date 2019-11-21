@@ -1,0 +1,27 @@
+{
+	"name": "azfunc_trigger",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Stopped",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "postit_azfunc",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"drools_rule": "dada"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Minute",
+				"interval": 5,
+				"startTime": "2019-11-18T07:21:00Z",
+				"timeZone": "UTC"
+			}
+		}
+	}
+}

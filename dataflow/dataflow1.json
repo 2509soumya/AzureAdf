@@ -1,0 +1,35 @@
+{
+	"name": "dataflow1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "CosmosDbSqlApiCollection1",
+						"type": "DatasetReference"
+					},
+					"name": "cosmossource"
+				},
+				{
+					"dataset": {
+						"referenceName": "CosmosDbSqlApiCollection2",
+						"type": "DatasetReference"
+					},
+					"name": "rules"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "CosmosDbSqlApiCollection1",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
+			"transformations": [],
+			"script": "\n\nsource(output(\n\t\t{In Reference To} as string,\n\t\t{_attachments} as string,\n\t\t{_etag} as string,\n\t\t{_rid} as string,\n\t\t{_self} as string,\n\t\t{_ts} as integer,\n\t\taccountID as string[],\n\t\taccountType as string[],\n\t\taccountingPrinciple as string,\n\t\tadditionalField1 as string[],\n\t\tadditionalField2 as string[],\n\t\tadditionalField3 as string[],\n\t\tadditionalField4 as string[],\n\t\tadditionalField5 as string[],\n\t\tassignmentNbr as string[],\n\t\tbaseAmount as string[],\n\t\tbudgetLine as string[],\n\t\tbusinessTransaction as string[],\n\t\tcentralBuyingRegion as string,\n\t\tcompany as string[],\n\t\tconceptCode as string[],\n\t\tcostAmount as string[],\n\t\tcostCenter as string[],\n\t\tcountry as string,\n\t\tcurrency as string,\n\t\tdepartment as string[],\n\t\tdetermineTaxBase as string[],\n\t\tdocDate as string,\n\t\tdocHeaderText as string,\n\t\tdocInfo as string[],\n\t\tdocReferenceNumber as string,\n\t\texchangeRate as string,\n\t\tid as string,\n\t\tingestLinkID as string,\n\t\tinternalOrder as string[],\n\t\titem as string[],\n\t\tjurisdiction as string[],\n\t\tlegacyPO as string[],\n\t\tpostingDate as string,\n\t\tprofitCenter as string[],\n\t\tquantityAmount as string[],\n\t\tquantityUOM as string[],\n\t\treferenceNbr as string[],\n\t\tretailAmount as string[],\n\t\treversalDate as string,\n\t\treversalReason as string,\n\t\tsourceId as string,\n\t\ttaxtype as string[],\n\t\ttradingPartner as string[]\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tquery: 'SELECT * FROM c WHERE (GetCurrentTimestamp()-(c._ts*1000))/1000 < 3600',\n\tformat: 'documentQuery',\n\tsystemColumns: false,\n\tbatchSize: 0,\n\tthroughput: 1000) ~> cosmossource\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tformat: 'document') ~> rules\ncosmossource sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'document') ~> sink1"
+		}
+	}
+}

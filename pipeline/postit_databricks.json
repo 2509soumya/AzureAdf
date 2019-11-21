@@ -1,0 +1,75 @@
+{
+	"name": "postit_databricks",
+	"properties": {
+		"activities": [
+			{
+				"name": "TransformInSpark",
+				"type": "DatabricksSparkJar",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"mainClassName": "com.postit.rules.PostItSpark",
+					"parameters": [
+						"@pipeline().parameters.query"
+					],
+					"libraries": [
+						{
+							"jar": "dbfs:/FileStore/job-jars/93b115d1_cc7f_436c_8b12_c336fbdeb657-sparkprojectinit_2_11_0_1.jar"
+						}
+					]
+				},
+				"linkedServiceName": {
+					"referenceName": "AzureDatabricks123",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "LookupForErrors",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "TransformInSpark",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "CosmosDbSqlApiSource",
+						"query": "SELECT c.statusCodes FROM c \nJOIN t IN c.statusCodes\nwhere t!= \"0\"",
+						"preferredRegions": []
+					},
+					"dataset": {
+						"referenceName": "CosmosDbSqlApiCollection3",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"parameters": {
+			"query": {
+				"type": "string",
+				"defaultValue": "SELECT * FROM c"
+			}
+		},
+		"annotations": []
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

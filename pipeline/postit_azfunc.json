@@ -1,0 +1,151 @@
+{
+	"name": "postit_azfunc",
+	"properties": {
+		"activities": [
+			{
+				"name": "DeltaFromCosmos",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "CosmosDbSqlApiSource",
+						"query": "SELECT VALUE udf.stripUnderscoreFields(c) FROM c WHERE (GetCurrentTimestamp()-(c._ts*1000))/1000 < 3600",
+						"preferredRegions": []
+					},
+					"dataset": {
+						"referenceName": "CosmosDbSqlApiCollection1",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "IterateOverEvents",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "DeltaFromCosmos",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('DeltaFromCosmos').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "TransformFunc",
+							"type": "AzureFunctionActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"functionName": "PostItAzureFuncForADF",
+								"method": "POST",
+								"body": {
+									"value": "@item()",
+									"type": "Expression"
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "PostItFunction",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Validate Transform Output",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "TransformFunc",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(1,0)",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "Webhook",
+										"type": "WebActivity",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"url": "https://localhost",
+											"method": "GET"
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "persistToCosmos",
+										"type": "AzureFunctionActivity",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "7.00:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"functionName": "WriteToCosmosSql",
+											"method": "POST",
+											"body": {
+												"value": "@activity('TransformFunc').output.Response",
+												"type": "Expression"
+											}
+										},
+										"linkedServiceName": {
+											"referenceName": "PostItFunction",
+											"type": "LinkedServiceReference"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"drools_rule": {
+				"type": "string",
+				"defaultValue": "package ruleenginepostit;  import com.wal.azurefunc.model.*; import com.wal.azurefunc.*; import java.util.*;  global java.util.Map mapped_rules; global java.util.List transformed_lineitem;  rule \"PostItRuleEngine\"  when      $item: LineItemPojo() then    List<RulesModel> transform_model =(ArrayList<RulesModel>) mapped_rules.get($item.getConceptCode());    for(RulesModel rules: transform_model){    LineItemPojo newtransform=$item.clone();        //            //    newtransform.setAccountType(\"G\");    newtransform.setAccountID(rules.getAllocateToAcc());       //newtransform.setCompany();    //newtransform.setProfitCenter();    //newtransform.setCostCenter();       newtransform.setCostAmount(\"\"+Double.parseDouble($item.getCostAmount())*(rules.getPercentToTake()/100.0));         transformed_lineitem.add(newtransform);    }  end"
+			}
+		},
+		"annotations": []
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
