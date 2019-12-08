@@ -875,26 +875,6 @@
 								"parameters": {}
 							}
 						]
-					},
-					{
-						"name": "Set variable1",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Copy data1",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "varr",
-							"value": {
-								"value": "@activity('Copy data1').output",
-								"type": "Expression"
-							}
-						}
 					}
 				],
 				"parameters": {
@@ -946,6 +926,7 @@
 				"typeProperties": {
 					"location": {
 						"type": "AzureBlobStorageLocation",
+						"fileName": "Output_@{formatDateTime(utcnow(), 'yyyy-MM-dd')}.csv",
 						"folderPath": "input",
 						"container": "adftutorial"
 					},
