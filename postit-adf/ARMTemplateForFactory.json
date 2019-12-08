@@ -1,0 +1,933 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "postit-adf"
+		},
+		"AzureDatabricks_accessToken": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accessToken' of 'AzureDatabricks'"
+		},
+		"AzureDatabricks123_accessToken": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accessToken' of 'AzureDatabricks123'"
+		},
+		"CosmosDb1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'CosmosDb1'"
+		},
+		"CosmosDbSQL_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'CosmosDbSQL'"
+		},
+		"CosmosDbTransform_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'CosmosDbTransform'"
+		},
+		"PostItFunction_functionKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'functionKey' of 'PostItFunction'"
+		},
+		"MySql1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'MySql1'"
+		},
+		"AzureBlobStorage1_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AzureBlobStorage1'"
+		},
+		"azfunc_trigger_properties_postit_azfunc_parameters_drools_rule": {
+			"type": "string",
+			"defaultValue": "dada"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/postit_azfunc')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "DeltaFromCosmos",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "CosmosDbSqlApiSource",
+								"query": "SELECT VALUE udf.stripUnderscoreFields(c) FROM c WHERE (GetCurrentTimestamp()-(c._ts*1000))/1000 < 3600",
+								"preferredRegions": []
+							},
+							"dataset": {
+								"referenceName": "CosmosDbSqlApiCollection1",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "IterateOverEvents",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "DeltaFromCosmos",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('DeltaFromCosmos').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "TransformFunc",
+									"type": "AzureFunctionActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"functionName": "PostItAzureFuncForADF",
+										"method": "POST",
+										"headers": {},
+										"body": {
+											"value": "@item()",
+											"type": "Expression"
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "PostItFunction",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "Validate Transform Output",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "TransformFunc",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@greater(1,0)",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "Webhook",
+												"type": "WebActivity",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"url": "https://localhost",
+													"method": "GET",
+													"headers": {}
+												}
+											}
+										],
+										"ifTrueActivities": [
+											{
+												"name": "persistToCosmos",
+												"type": "AzureFunctionActivity",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"functionName": "WriteToCosmosSql",
+													"method": "POST",
+													"headers": {},
+													"body": {
+														"value": "@activity('TransformFunc').output.Response",
+														"type": "Expression"
+													}
+												},
+												"linkedServiceName": {
+													"referenceName": "PostItFunction",
+													"type": "LinkedServiceReference"
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				],
+				"parameters": {
+					"drools_rule": {
+						"type": "string",
+						"defaultValue": "package ruleenginepostit;  import com.wal.azurefunc.model.*; import com.wal.azurefunc.*; import java.util.*;  global java.util.Map mapped_rules; global java.util.List transformed_lineitem;  rule \"PostItRuleEngine\"  when      $item: LineItemPojo() then    List<RulesModel> transform_model =(ArrayList<RulesModel>) mapped_rules.get($item.getConceptCode());    for(RulesModel rules: transform_model){    LineItemPojo newtransform=$item.clone();        //            //    newtransform.setAccountType(\"G\");    newtransform.setAccountID(rules.getAllocateToAcc());       //newtransform.setCompany();    //newtransform.setProfitCenter();    //newtransform.setCostCenter();       newtransform.setCostAmount(\"\"+Double.parseDouble($item.getCostAmount())*(rules.getPercentToTake()/100.0));         transformed_lineitem.add(newtransform);    }  end"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/CosmosDbSqlApiCollection1')]",
+				"[concat(variables('factoryId'), '/linkedServices/PostItFunction')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/postit_databricks')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "TransformInSpark",
+						"type": "DatabricksSparkJar",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"mainClassName": "com.postit.rules.PostItSpark",
+							"parameters": [
+								"@pipeline().parameters.query"
+							],
+							"libraries": [
+								{
+									"jar": "dbfs:/FileStore/job-jars/93b115d1_cc7f_436c_8b12_c336fbdeb657-sparkprojectinit_2_11_0_1.jar"
+								}
+							]
+						},
+						"linkedServiceName": {
+							"referenceName": "AzureDatabricks123",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "LookupForErrors",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "TransformInSpark",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "CosmosDbSqlApiSource",
+								"query": "SELECT c.statusCodes FROM c \nJOIN t IN c.statusCodes\nwhere t!= \"0\"",
+								"preferredRegions": []
+							},
+							"dataset": {
+								"referenceName": "CosmosDbSqlApiCollection3",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"firstRowOnly": false
+						}
+					}
+				],
+				"parameters": {
+					"query": {
+						"type": "string",
+						"defaultValue": "SELECT * FROM c"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDatabricks123')]",
+				"[concat(variables('factoryId'), '/datasets/CosmosDbSqlApiCollection3')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/postitbatch')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "dataflow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "dataflow1",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"cosmossource": {},
+									"rules": {},
+									"sink1": {}
+								}
+							},
+							"staging": {}
+						}
+					}
+				],
+				"parameters": {
+					"watermark": {
+						"type": "string",
+						"defaultValue": "100"
+					}
+				},
+				"variables": {
+					"watermarkvalue": {
+						"type": "String",
+						"defaultValue": "100"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/dataflows/dataflow1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CosmosDbSqlApiCollection1')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "CosmosDbSQL",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "CosmosDbSqlApiCollection",
+				"schema": {},
+				"typeProperties": {
+					"collectionName": "postitcontainer"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/CosmosDbSQL')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CosmosDbSqlApiCollection2')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "CosmosDbSQL",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "CosmosDbSqlApiCollection",
+				"schema": {},
+				"typeProperties": {
+					"collectionName": "rules_container"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/CosmosDbSQL')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CosmosDbSqlApiCollection3')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "CosmosDbTransform",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "CosmosDbSqlApiCollection",
+				"schema": {
+					"type": "object",
+					"properties": {
+						"sourceId": {
+							"type": "string"
+						},
+						"statusCodes": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"country": {
+							"type": "string"
+						},
+						"budgetLine": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"additionalField3": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"quantityUOM": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"additionalField4": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"additionalField5": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"jurisdiction": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"conceptCode": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"ingestLinkID": {
+							"type": "string"
+						},
+						"postingDate": {
+							"type": "string"
+						},
+						"profitCenter": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"assignmentNbr": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"taxtype": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"accountID": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"reversalReason": {
+							"type": "string"
+						},
+						"statusReason": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"exchangeRate": {
+							"type": "string"
+						},
+						"legacyPO": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"currency": {
+							"type": "string"
+						},
+						"company": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"accountingPrinciple": {
+							"type": "string"
+						},
+						"docReferenceNumber": {
+							"type": "string"
+						},
+						"department": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"retailAmount": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"item": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"docHeaderText": {
+							"type": "string"
+						},
+						"costCenter": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"reversalDate": {
+							"type": "string"
+						},
+						"accountType": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"docInfo": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"costAmount": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"docDate": {
+							"type": "string"
+						},
+						"determineTaxBase": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"quantityAmount": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"baseAmount": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"internalOrder": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"centralBuyingRegion": {
+							"type": "string"
+						},
+						"tradingPartner": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"referenceNbr": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"businessTransaction": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"additionalField1": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"additionalField2": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						"In Reference To": {
+							"type": "string"
+						}
+					}
+				},
+				"typeProperties": {
+					"collectionName": "postittransformcontainer"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/CosmosDbTransform')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricks')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://southcentralus.azuredatabricks.net",
+					"accessToken": {
+						"type": "SecureString",
+						"value": "[parameters('AzureDatabricks_accessToken')]"
+					},
+					"existingClusterId": "1118-184127-wiles390"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureDatabricks123')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureDatabricks",
+				"typeProperties": {
+					"domain": "https://southcentralus.azuredatabricks.net",
+					"accessToken": {
+						"type": "SecureString",
+						"value": "[parameters('AzureDatabricks123_accessToken')]"
+					},
+					"existingClusterId": "1118-184127-wiles390"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CosmosDb1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "CosmosDb",
+				"typeProperties": {
+					"connectionString": "[parameters('CosmosDb1_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CosmosDbSQL')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "CosmosDb",
+				"typeProperties": {
+					"connectionString": "[parameters('CosmosDbSQL_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/CosmosDbTransform')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "CosmosDb",
+				"typeProperties": {
+					"connectionString": "[parameters('CosmosDbTransform_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PostItFunction')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureFunction",
+				"typeProperties": {
+					"functionAppUrl": "https://postitfuncappl.azurewebsites.net",
+					"functionKey": {
+						"type": "SecureString",
+						"value": "[parameters('PostItFunction_functionKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/azfunc_trigger')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "postit_azfunc",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"drools_rule": "[parameters('azfunc_trigger_properties_postit_azfunc_parameters_drools_rule')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Minute",
+						"interval": 5,
+						"startTime": "2019-11-18T07:21:00Z",
+						"timeZone": "UTC"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/postit_azfunc')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dataflow1')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "CosmosDbSqlApiCollection1",
+								"type": "DatasetReference"
+							},
+							"name": "cosmossource",
+							"typeProperties": {}
+						},
+						{
+							"dataset": {
+								"referenceName": "CosmosDbSqlApiCollection2",
+								"type": "DatasetReference"
+							},
+							"name": "rules",
+							"typeProperties": {}
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "CosmosDbSqlApiCollection1",
+								"type": "DatasetReference"
+							},
+							"name": "sink1"
+						}
+					],
+					"transformations": [],
+					"script": "\n\nsource(output(\n\t\t{In Reference To} as string,\n\t\t{_attachments} as string,\n\t\t{_etag} as string,\n\t\t{_rid} as string,\n\t\t{_self} as string,\n\t\t{_ts} as integer,\n\t\taccountID as string[],\n\t\taccountType as string[],\n\t\taccountingPrinciple as string,\n\t\tadditionalField1 as string[],\n\t\tadditionalField2 as string[],\n\t\tadditionalField3 as string[],\n\t\tadditionalField4 as string[],\n\t\tadditionalField5 as string[],\n\t\tassignmentNbr as string[],\n\t\tbaseAmount as string[],\n\t\tbudgetLine as string[],\n\t\tbusinessTransaction as string[],\n\t\tcentralBuyingRegion as string,\n\t\tcompany as string[],\n\t\tconceptCode as string[],\n\t\tcostAmount as string[],\n\t\tcostCenter as string[],\n\t\tcountry as string,\n\t\tcurrency as string,\n\t\tdepartment as string[],\n\t\tdetermineTaxBase as string[],\n\t\tdocDate as string,\n\t\tdocHeaderText as string,\n\t\tdocInfo as string[],\n\t\tdocReferenceNumber as string,\n\t\texchangeRate as string,\n\t\tid as string,\n\t\tingestLinkID as string,\n\t\tinternalOrder as string[],\n\t\titem as string[],\n\t\tjurisdiction as string[],\n\t\tlegacyPO as string[],\n\t\tpostingDate as string,\n\t\tprofitCenter as string[],\n\t\tquantityAmount as string[],\n\t\tquantityUOM as string[],\n\t\treferenceNbr as string[],\n\t\tretailAmount as string[],\n\t\treversalDate as string,\n\t\treversalReason as string,\n\t\tsourceId as string,\n\t\ttaxtype as string[],\n\t\ttradingPartner as string[]\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tquery: 'SELECT * FROM c WHERE (GetCurrentTimestamp()-(c._ts*1000))/1000 < 3600',\n\tformat: 'documentQuery',\n\tsystemColumns: false,\n\tbatchSize: 0,\n\tthroughput: 1000) ~> cosmossource\nsource(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tformat: 'document') ~> rules\ncosmossource sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'document') ~> sink1"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/CosmosDbSqlApiCollection1')]",
+				"[concat(variables('factoryId'), '/datasets/CosmosDbSqlApiCollection2')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/MySql1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "MySql",
+				"typeProperties": {
+					"connectionString": "[parameters('MySql1_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AzureBlobStorage1')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AzureBlobStorage1_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pipeline1')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "select * from employee"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "MySqlTable1",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DelimitedText1",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/MySqlTable1')]",
+				"[concat(variables('factoryId'), '/datasets/DelimitedText1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/MySqlTable1')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "MySql1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "MySqlTable",
+				"schema": [],
+				"typeProperties": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/MySql1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DelimitedText1')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureBlobStorage1",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": "input",
+						"container": "adftutorial"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureBlobStorage1')]"
+			]
+		}
+	]
+}

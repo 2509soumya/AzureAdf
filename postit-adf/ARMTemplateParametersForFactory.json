@@ -1,0 +1,36 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "postit-adf"
+		},
+		"AzureDatabricks_accessToken": {
+			"value": ""
+		},
+		"AzureDatabricks123_accessToken": {
+			"value": ""
+		},
+		"CosmosDb1_connectionString": {
+			"value": ""
+		},
+		"CosmosDbSQL_connectionString": {
+			"value": ""
+		},
+		"CosmosDbTransform_connectionString": {
+			"value": ""
+		},
+		"PostItFunction_functionKey": {
+			"value": ""
+		},
+		"MySql1_connectionString": {
+			"value": ""
+		},
+		"AzureBlobStorage1_connectionString": {
+			"value": ""
+		},
+		"azfunc_trigger_properties_postit_azfunc_parameters_drools_rule": {
+			"value": "dada"
+		}
+	}
+}
